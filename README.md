@@ -47,7 +47,7 @@ docker-compose logs -f
 ### 3. Running Manually (Localhost)
 If you need to edit code and debug locally without rebuilding containers, run the services in two separate terminals.
 
-Terminal 1: Start the Python Backend
+**Terminal 1:** Start the Python Backend
 
 ```bash
 cd core
@@ -65,7 +65,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Terminal 2: Start the Discord Bot Frontend
+**Terminal 2:** Start the Discord Bot Frontend
 
 ```bash
 cd bot

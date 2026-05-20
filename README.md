@@ -11,9 +11,12 @@
 </div>
 <br>
 
-![GitHub Repo stars](https://img.shields.io/github/stars/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge&color=%23FFD700)
- ![GitHub Release](https://img.shields.io/github/v/release/NeKoRoSYS/NeKoRoBOT.js?display_name=tag&style=for-the-badge) ![Size](https://img.shields.io/github/repo-size/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge) ![GitHub last commit](https://img.shields.io/github/last-commit/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge) ![GitHub contributors](https://img.shields.io/github/contributors/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge) ![Discord](https://img.shields.io/discord/999633886994780201?style=for-the-badge&label=Discord&color=%235865F2)
- 
+<div align="center">
+  
+![GitHub Repo stars](https://img.shields.io/github/stars/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge&color=%23FFD700) ![Size](https://img.shields.io/github/repo-size/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge) ![GitHub last commit](https://img.shields.io/github/last-commit/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge) ![GitHub contributors](https://img.shields.io/github/contributors/NeKoRoSYS/NeKoRoBOT.js?style=for-the-badge) ![Discord](https://img.shields.io/discord/999633886994780201?style=for-the-badge&label=Discord&color=%235865F2)
+
+</div>
+
 </div>
 
 <br>

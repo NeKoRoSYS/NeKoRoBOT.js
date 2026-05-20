@@ -21,7 +21,7 @@ Tech Stack
 - Have a virutual environment for **Python** and `pip` to install dependencies in `requirements.txt`.
   - I recommend making a virtual environment within the `core` folder for there you can install the packages locally and run the database so that it won't mess with your global environment.
 
-## Getting Started (Local Development)
+## Getting Started
 
 ### 1. Configuration
 Before running the project, you must configure your environment variables.

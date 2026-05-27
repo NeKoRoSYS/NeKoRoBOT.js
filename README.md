@@ -150,6 +150,7 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 <br>
 
 <h2 align="center">Reminders and Limitations</h2>
+
 - The codebase is hardened and production-ready but it is not secure over the internet. To ensure security, add another layer of protection by setting up `nginx` (webserver) and `certbot` (SSL certificates) on your Linux VPS if you intend to deploy this bot on remote servers.
 - Make sure to sanitize the DB by using `motor` and passing structured dictionaries as data.
 - Use `asyncio` for the Python backend so that heavy-duty processing won't block bot function.
@@ -158,6 +159,7 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 <br>
 
 <h2 align="center">Upcoming Features</h2>
+
 - Dashboard powered by React.js w/ Tailwind CSS
 - JWT for handshake
 

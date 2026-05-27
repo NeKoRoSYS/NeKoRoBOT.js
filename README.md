@@ -137,7 +137,6 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 
 <h2 align="center">Features</h2>
 
-- Documentation - Coming soon!
 - **Database-agnostic Backend** - Done via abstraction layer between the active DB implementation (currently MongoDB) and the data handlers. This makes it easier to swap from one database to another if necessary.
 - **Hardened Security**
   - Uses `.env` to hide secret variables and requires an API Token to securely establish a WebSocket connection from the bot to the database.
@@ -164,6 +163,7 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 
 - Dashboard powered by React.js w/ Tailwind CSS
 - JWT for handshake
+- The man, the myth, the legend—Documentation!
 
 <br>
 

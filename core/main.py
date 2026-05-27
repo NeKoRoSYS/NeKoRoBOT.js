@@ -3,6 +3,26 @@ import asyncio
 import websockets
 from db.repo_factory import db
 import logic.db_handler
+import collections
+import time
+
+class RateLimiter:
+    def __init__(self, max_actions: int, timeframe: float = 1.0):
+        self.max_actions = max_actions
+        self.timeframe = timeframe
+        self.history = collections.deque()
+
+    def is_allowed(self) -> bool:
+        now = time.perf_counter()
+        
+        while self.history and (now - self.history[0] > self.timeframe):
+            self.history.popleft()
+            
+        if len(self.history) < self.max_actions:
+            self.history.append(now)
+            return True
+            
+        return False
 
 ROUTES = {
     'handshake': logic.db_handler.handle_handshake,
@@ -16,9 +36,19 @@ authenticated_clients = set()
 
 async def handle_connection(websocket):
     print("New WebSocket connection established.")
+    limiter = RateLimiter(max_actions=25, timeframe=1)
     try:
         async for message in websocket:
             try:
+                if not limiter.is_allowed():
+                    print("Rate limit exceeded for a client.")
+                    await websocket.send(json.dumps({
+                        "error": True,
+                        "message": "Too many requests. Please slow down.",
+                        "interaction_id": interaction_id
+                    }))
+                    break
+                
                 payload = json.loads(message)
                 action = payload.get('action')
                 interaction_id = payload.get('interaction_id')

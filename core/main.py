@@ -1,6 +1,8 @@
 import json
 import asyncio
 import websockets
+import os
+from dotenv import load_dotenv
 from db.repo_factory import db
 import logic.db_handler
 import collections
@@ -32,10 +34,29 @@ ROUTES = {
     'delete_user': logic.db_handler.handle_delete
 }
 
+load_dotenv()
+TOKEN = os.getenv('APITOKEN')
+
 authenticated_clients = set()
 
 async def handle_connection(websocket):
     print("New WebSocket connection established.")
+    
+    print(f"Incoming headers: {websocket.request.headers}")
+    
+    client_id = websocket.request.headers.get("Client-ID", "")
+    auth_header = websocket.request.headers.get("Authorization", "")
+    
+    if client_id != "NexsplitBot/1.0":
+        print(f"Blocked connection: Invalid Client ID. Got: '{client_id}'")
+        await websocket.close(code=1008, reason="Policy Violation")
+        return
+        
+    if auth_header != f"Bearer {TOKEN}":
+        print("Blocked connection: Invalid Authorization header.")
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+    
     limiter = RateLimiter(max_actions=25, timeframe=1)
     try:
         async for message in websocket:

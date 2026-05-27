@@ -20,18 +20,26 @@ export class BackendService {
     public connect(client: BotClient, url: string, botId: string): void {
         this.client = client;
         this.ws?.removeAllListeners();
-        this.ws = new WebSocket(url);
+
+        const apiToken = process.env.APITOKEN;
+        if (!apiToken) {
+            console.error('CRITICAL: APITOKEN is missing from environment variables.');
+            return;
+        }
+
+        this.ws = new WebSocket(url, {
+            headers: {
+                "Client-ID": "NexsplitBot/1.0",
+                "Authorization": `Bearer ${apiToken}`
+            }
+        });
 
         this.ws.on('open', () => {
             console.log('Connected to Python Backend via WebSocket!');
             
-            const apiToken = process.env.APITOKEN;
-            if (!apiToken) {
-                console.error('CRITICAL: APITOKEN is missing from environment variables.');
-            }
-
             this.ws?.send(JSON.stringify({ 
                 action: BackendAction.HANDSHAKE, 
+                interaction_id: "handshake_init",
                 bot_id: botId,
                 auth_token: apiToken
             }));
@@ -69,6 +77,11 @@ export class BackendService {
                 }
             }
             this.client.wsRequests.clear();
+
+            if (code === 1008) {
+                console.error("FATAL: Backend rejected the connection (Invalid Headers/Token). Halting reconnects.");
+                return; 
+            }
 
             const delay = Math.min(1000 * (2 ** this.reconnectAttempts), 30000);
             this.reconnectAttempts++;

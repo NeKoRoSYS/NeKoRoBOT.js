@@ -1,5 +1,7 @@
 import json
 import asyncio
+from db.db_schemas import BasePayload
+from pydantic import ValidationError
 import websockets
 import os
 from dotenv import load_dotenv
@@ -47,7 +49,7 @@ async def handle_connection(websocket):
     client_id = websocket.request.headers.get("Client-ID", "")
     auth_header = websocket.request.headers.get("Authorization", "")
     
-    if client_id != "NexsplitBot/1.0":
+    if client_id != "TemplateBot/1.0": # CHANGE THIS
         print(f"Blocked connection: Invalid Client ID. Got: '{client_id}'")
         await websocket.close(code=1008, reason="Policy Violation")
         return
@@ -71,8 +73,15 @@ async def handle_connection(websocket):
                     break
                 
                 payload = json.loads(message)
-                action = payload.get('action')
-                interaction_id = payload.get('interaction_id')
+                
+                try:
+                    data = BasePayload(**payload)
+                except ValidationError:
+                    print("Dropped malformed base payload.")
+                    continue
+                
+                action = data.action
+                interaction_id = data.interaction_id
                 
                 if action == 'handshake':
                     success = await logic.db_handler.handle_handshake(websocket, payload, interaction_id)

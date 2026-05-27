@@ -29,7 +29,7 @@ export class BackendService {
 
         this.ws = new WebSocket(url, {
             headers: {
-                "Client-ID": "NexsplitBot/1.0",
+                "Client-ID": "TemplateBot/1.0", // CHANGE THIS
                 "Authorization": `Bearer ${apiToken}`
             }
         });

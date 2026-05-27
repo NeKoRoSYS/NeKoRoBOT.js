@@ -1,4 +1,5 @@
 from db.interfaces.i_user_repo import IUserRepository
+from pymongo.errors import DuplicateKeyError
 
 class MongoUserRepository:
     def __init__(self, collection):
@@ -10,13 +11,12 @@ class MongoUserRepository:
     # CREATE
     async def create_user(self, discord_id: str, username: str, bio: str = "Hello World!") -> bool:
         try:
-            await self.collection.insert_one({
-                "discord_id": discord_id,
-                "username": username,
-                "bio": bio
-            })
+            await self.collection.insert_one({...})
             return True
-        except:
+        except DuplicateKeyError:
+            return False
+        except Exception as e:
+            print(f"Database insertion failed: {e}")
             return False
 
     # READ

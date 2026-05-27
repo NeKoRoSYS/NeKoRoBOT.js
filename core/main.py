@@ -97,8 +97,8 @@ async def main():
     print("Initializing database indexes...")
     await db.initialize_all()
 
-    start_server = websockets.serve(handle_connection, "0.0.0.0", 8000)
-    
+    start_server = websockets.serve(handle_connection, "0.0.0.0", 8000, ping_interval=20, ping_timeout=20)
+
     print("Python WebSocket server listening on ws://0.0.0.0:8000")
     async with start_server:
         await asyncio.Future()

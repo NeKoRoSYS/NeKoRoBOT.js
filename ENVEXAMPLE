@@ -1,7 +1,10 @@
-# ==========================================
-# BOILERPLATE CONFIGURATION TEMPLATE
-# Copy this file to PROJECT_ROOT/.env and fill in your values
-# ==========================================
+# =========================================================== #
+# BOILERPLATE CONFIGURATION TEMPLATE                          #
+# Copy this file to PROJECT_ROOT/.env and fill in your values #
+# PLEASE PLEAASE PLEASE do NOT ship this file to the public!  #
+# Only you and the server must know about its existence or    #
+# otherwise people will have access to your bot.              #
+# =========================================================== #
 
 # WebSockets API Configuration
 APIURL=http://localhost:8000

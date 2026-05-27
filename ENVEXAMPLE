@@ -9,6 +9,7 @@
 # WebSockets API Configuration
 APIURL=http://localhost:8000
 APITOKEN=your_secure_websocket_token_here
+CLIENTHEADER=TemplateBot/1.0
 
 # Database Configuration (MongoDB)
 DBENGINE=mongodb

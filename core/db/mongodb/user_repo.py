@@ -11,7 +11,12 @@ class MongoUserRepository:
     # CREATE
     async def create_user(self, discord_id: str, username: str, bio: str = "Hello World!") -> bool:
         try:
-            await self.collection.insert_one({...})
+            document = {
+                "discord_id": discord_id,
+                "username": username,
+                "bio": bio
+            }
+            await self.collection.insert_one(document)
             return True
         except DuplicateKeyError:
             return False

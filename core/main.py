@@ -1,5 +1,6 @@
 import json
 import asyncio
+import logging
 from db.db_schemas import BasePayload
 from pydantic import ValidationError
 import websockets
@@ -36,8 +37,14 @@ ROUTES = {
     'delete_user': logic.db_handler.handle_delete
 }
 
+logging.basicConfig(
+    level=logging.ERROR, 
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 load_dotenv()
 TOKEN = os.getenv('APITOKEN')
+HEADER = os.getenv('CLIENTHEADER')
 
 authenticated_clients = set()
 
@@ -49,7 +56,7 @@ async def handle_connection(websocket):
     client_id = websocket.request.headers.get("Client-ID", "")
     auth_header = websocket.request.headers.get("Authorization", "")
     
-    if client_id != "TemplateBot/1.0": # CHANGE THIS
+    if client_id != f"{HEADER}":
         print(f"Blocked connection: Invalid Client ID. Got: '{client_id}'")
         await websocket.close(code=1008, reason="Policy Violation")
         return
@@ -118,7 +125,7 @@ async def handle_connection(websocket):
     except websockets.exceptions.ConnectionClosedOK:
         print("WebSocket connection closed cleanly.")
     except Exception as e:
-        print(f"WebSocket connection error: {e}")
+        logging.exception("An unexpected WebSocket connection error occurred:")
     finally:
         if websocket in authenticated_clients:
             authenticated_clients.remove(websocket)

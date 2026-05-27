@@ -58,7 +58,7 @@ async def handle_create(websocket, payload, interaction_id):
         return
         
     in_flight_requests.add(discord_id)
-    try:
+    try: # You might have to remove in_flight_requests in the future if you want horizontal scaling
         success = await db.user_repo.create_user(discord_id, username)
         if success:
             await websocket.send(json.dumps({"event": "created", "interaction_id": interaction_id}))

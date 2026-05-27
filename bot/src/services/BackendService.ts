@@ -27,9 +27,15 @@ export class BackendService {
             return;
         }
 
+        const clientHeader = process.env.CLIENTHEADER;
+        if (!clientHeader) {
+            console.error('CRITICAL: CLIENTHEADER is missing from environment variables.');
+            return;
+        }
+
         this.ws = new WebSocket(url, {
             headers: {
-                "Client-ID": "TemplateBot/1.0", // CHANGE THIS
+                "Client-ID": `${clientHeader}`,
                 "Authorization": `Bearer ${apiToken}`
             }
         });

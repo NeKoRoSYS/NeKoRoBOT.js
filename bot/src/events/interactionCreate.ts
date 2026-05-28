@@ -1,4 +1,4 @@
-import { Events, Collection, Interaction, MessageFlagsBitField, ChatInputCommandInteraction, CacheType, ContextMenuCommandInteraction, AutocompleteInteraction, ModalSubmitInteraction, ButtonInteraction } from 'discord.js';
+import { Events, Collection, Interaction, MessageFlagsBitField, ChatInputCommandInteraction, CacheType, ContextMenuCommandInteraction, AutocompleteInteraction, ModalSubmitInteraction, ButtonInteraction, ChannelType, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, MessageFlags } from 'discord.js';
 import { BotClient } from '../structures/BotClient';
 import { Command, ContextMenuCommand } from '../types/discord';
 import { BackendError } from '../types/backend';
@@ -46,14 +46,26 @@ async function handleError(error: unknown, interaction: any) {
         ? (error as BackendError).message 
         : 'There was an error while executing this command!';
     
-    const replyPayload = { content, flags: [MessageFlagsBitField.Flags.Ephemeral] };
+    const embed = new ContainerBuilder()
+        .setAccentColor(0xFFA500)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent("**nexsplit | Error**"))
+        .addSeparatorComponents(new SeparatorBuilder().setDivider(true))
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`${content}`),
+        )
+
+    const replyPayload = { 
+        components: [embed], 
+        flags: [MessageFlagsBitField.Flags.IsComponentsV2]
+    };
 
     try {
-        const { flags, ...editPayload } = replyPayload;
-        await interaction.deferred ? await interaction.editReply(editPayload as any) :
-              interaction.replied ? interaction.followUp(replyPayload as any) :
-              interaction.reply(replyPayload as any);
-    } catch (replyError) { console.error('Failed to send error response to user:', replyError); }
+        await interaction.deferred ? await interaction.editReply(replyPayload as any) :
+              interaction.replied ? await interaction.followUp(replyPayload as any) :
+              await interaction.reply(replyPayload as any);
+    } catch (replyError) { 
+        console.error('Failed to send error response to user:', replyError); 
+    }
 }
 
 export default {

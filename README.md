@@ -100,7 +100,7 @@ This is a full-stack Discord.js Bot template that includes code for the frontend
 <h2 align="center">Why choose NeKoRoBOT.js?</h2>
 <br>
 
-A lot of the Discord.js bot templates I've seen online are mainly designed for beginners. This project however, aims to accomodate intermediate to pro-level programmers who are more equipped to handle backend code. Compared to others, this project does not run by a monolithic architecture; it's built to be robust, modular, and scalable. I made it as generic as possible so that you can easily build on top of it with your own features in mind.
+A lot of the Discord.js bot templates I've seen online are mainly designed for beginners. This project however, aims to accomodate intermediate to pro-level programmers who are more equipped to handle backend code. Compared to others, this project does not run by a monolithic architecture; it's built to be robust, modular, and scalable. I made it as generic as possible so that you can easily build on top of it with your own features in mind. NeKoRoBOT.js is built to be lean and unopinionated because every possible API interaction using the Discord bot counts and must be processed fast!
 
 <br>
 

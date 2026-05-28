@@ -19,4 +19,4 @@ export default {
             console.error("Failed to connect to backend: Client user is undefined.");
         }
     },
-};
+}; 

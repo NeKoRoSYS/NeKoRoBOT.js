@@ -5,10 +5,11 @@ import os
 import secrets
 from dotenv import load_dotenv
 from pydantic import ValidationError
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from db.db_schemas import BasePayload
 from db.repo_factory import db
 import logic.db_handler
-import websockets
 import collections
 import time
 
@@ -48,6 +49,9 @@ class WebSocketServer:
         
         self.authenticated_clients = set()
         
+        self.app = FastAPI(lifespan=self.lifespan)
+        self.app.add_api_websocket_route("/ws", self.websocket_endpoint)
+        
         self.ROUTES = { # Every string of route has a corresponding function found in root/core/logic/db_handler.py
             'handshake': logic.db_handler.handle_handshake,
             'create_user': logic.db_handler.handle_create,
@@ -56,13 +60,21 @@ class WebSocketServer:
             'delete_user': logic.db_handler.handle_delete
         }
         
-    async def handle_connection(self, websocket):
+    @asynccontextmanager
+    async def lifespan(self, app: FastAPI):
+        logging.info("Initializing database indexes...")
+        await db.initialize_all()
+        yield
+        
+    async def websocket_endpoint(self, websocket: WebSocket):
         logging.info("New WebSocket connection established.")
         
-        logging.info(f"Incoming headers: {websocket.request.headers}")
+        await websocket.accept()
         
-        client_id = websocket.request.headers.get("Client-ID", "")
-        auth_header = websocket.request.headers.get("Authorization", "")
+        logging.info(f"Incoming headers: {websocket.headers}")
+        
+        client_id = websocket.headers.get("Client-ID", "")
+        auth_header = websocket.headers.get("Authorization", "")
         
         if not secrets.compare_digest(client_id, f"{self.HEADER}"):
             logging.warning(f"Blocked connection: Invalid Client ID. Got: '{client_id}'")
@@ -77,7 +89,7 @@ class WebSocketServer:
         # -- Connection will only pass if the headers that the Discord.js bot sent matches with the headers set in the ENV variables
         
         try:
-            first_message = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+            first_message = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
             
             # A strict 5-second window where a handshake must be done
             
@@ -114,74 +126,72 @@ class WebSocketServer:
         
         limiter = RateLimiter(max_actions=25, timeframe=1)
         try:
-            async for message in websocket:
+            while True:
+                message = await websocket.receive_text()
+                
+                if not limiter.is_allowed():
+                    logging.warning("Rate limit exceeded for a client.")
+                    await websocket.send_json({
+                        "error": True,
+                        "message": "Too many requests. Please slow down.",
+                        "interaction_id": None
+                    })
+                    continue # Tell user to slow down before trying again
+                
                 try:
-                    if not limiter.is_allowed():
-                        logging.warning("Rate limit exceeded for a client.")
-                        await websocket.send(json.dumps({
-                            "error": True,
-                            "message": "Too many requests. Please slow down.",
-                            "interaction_id": None
-                        }))
-                        continue # Tell user to slow down before trying again
-                    
-                    try:
-                        payload = json.loads(message)
-                        if not isinstance(payload, dict):
-                            raise ValueError("Payload is not a dictionary")
-                        data = BasePayload(**payload)
-                    except (json.JSONDecodeError, ValidationError, ValueError) as e:
-                        logging.error(f"Dropped malformed base payload: {e}")
-                        continue
-                    
-                    action = data.action
-                    interaction_id = data.interaction_id
+                    payload = json.loads(message)
+                    if not isinstance(payload, dict):
+                        raise ValueError("Payload is not a dictionary")
+                    data = BasePayload(**payload)
+                except (json.JSONDecodeError, ValidationError, ValueError) as e:
+                    logging.error(f"Dropped malformed base payload: {e}")
+                    continue
+                
+                action = data.action
+                interaction_id = data.interaction_id
 
-                    if websocket not in self.authenticated_clients: # Block unauthorized clients
-                        logging.error(f"Blocked unauthenticated command attempt: {action}")
-                        await websocket.send(json.dumps({"error": True, "message": "Unauthorized. Handshake required."}))
-                        await websocket.close(code=1008, reason="Policy Violation")
-                        return
-                        
-                    handler = self.ROUTES.get(action) # The routes that I discussed earlier on are handled here
-                    if handler:
-                        try:
-                            await handler(websocket, payload, interaction_id)
-                        except Exception as e:
-                            logging.error(f"Internal Error in {action}: {e}")
-                            await websocket.send(json.dumps({
-                                "error": True, 
-                                "message": "Internal server error occurred.", 
-                                "interaction_id": interaction_id
-                            }))
-                    else:
-                        logging.error(f"Unknown action received: {action}")
-        
-                except json.JSONDecodeError:
-                    logging.error("Received invalid JSON format.")
+                if websocket not in self.authenticated_clients: # Block unauthorized clients
+                    logging.error(f"Blocked unauthenticated command attempt: {action}")
+                    await websocket.send_json({"error": True, "message": "Unauthorized. Handshake required."})
+                    await websocket.close(code=1008, reason="Policy Violation")
+                    return
                     
-        except websockets.exceptions.ConnectionClosedOK:
+                handler = self.ROUTES.get(action) # The routes that I discussed earlier on are handled here
+                if handler:
+                    try:
+                        await handler(websocket, payload, interaction_id)
+                    except Exception as e:
+                        logging.error(f"Internal Error in {action}: {e}")
+                        await websocket.send_json({
+                            "error": True, 
+                            "message": "Internal server error occurred.", 
+                            "interaction_id": interaction_id
+                        })
+                else:
+                    logging.error(f"Unknown action received: {action}")
+
+        except WebSocketDisconnect:
             logging.info("WebSocket connection closed cleanly.")
         except Exception as e:
             logging.exception("An unexpected WebSocket connection error occurred:")
         finally:
             if websocket in self.authenticated_clients:
-                self.authenticated_clients.remove(websocket) 
+                self.authenticated_clients.remove(websocket)
 
-    async def start(self, host: str = "0.0.0.0", port: int = 8000):
-        print("Initializing database indexes...")
-        await db.initialize_all()
-
-        server = websockets.serve(self.handle_connection, host, port, ping_interval=20, ping_timeout=20, max_size=1_048_576)
-        
-        print(f"Python WebSocket server listening on ws://{host}:{port}")
-        async with server:
-            await asyncio.Future()
+server = WebSocketServer()
+app = server.app
 
 if __name__ == "__main__":
+    import uvicorn
     logging.basicConfig(
         level=logging.ERROR, 
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
-    server = WebSocketServer()
-    asyncio.run(server.start()) 
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0", 
+        port=8000,
+        ws_ping_interval=20.0,
+        ws_ping_timeout=20.0,
+        ws_max_size=1048576
+    )

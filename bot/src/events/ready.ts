@@ -2,7 +2,7 @@ import { Events } from 'discord.js';
 import { BotClient } from '../structures/BotClient';
 import { BackendService } from '../services/BackendService';
 
-const APIURL = process.env.APIURL || 'http://localhost:8000';
+const APIURL = process.env.APIURL || 'http://localhost:8000/ws';
 
 export default {
     name: Events.ClientReady,

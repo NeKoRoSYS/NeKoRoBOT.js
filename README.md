@@ -163,7 +163,8 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 <h2 align="center">Upcoming Features</h2>
 
 - Dashboard powered by React.js w/ Tailwind CSS
-- JWT for handshake
+  - Replace pure websockets with FastAPI websockets to easily communicate with REST endpoints
+  - JWT for handshake
 - The man, the myth, the legend—Documentation!
 
 <br>

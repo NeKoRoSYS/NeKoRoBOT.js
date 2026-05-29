@@ -102,6 +102,12 @@ This is a full-stack Discord.js Bot template that includes code for the frontend
 
 A lot of the Discord.js bot templates I've seen online are mainly designed for beginners. This project however, aims to accomodate intermediate to pro-level programmers who are more equipped to handle backend code. Compared to others, this project does not run by a monolithic architecture; it's built to be robust, modular, and scalable. I made it as generic as possible so that you can easily build on top of it with your own features in mind. NeKoRoBOT.js is built to be lean and unopinionated because every possible API interaction using the Discord bot counts and must be processed fast!
 
+<h3>Why choose Python?</h3>
+
+NeKoRoBOT.js is a stripped-down version of a proprietary Discord bot me and my friend made for a custom matchmaking platform for a shooter game. We chose the Python interpreting language as the bot's backend instead of putting everything on Node.js for the following reasons:
+- To have clean separation of concerns. We want the frontend to only handle Discord.js and not mix database/connection logic with it too much. Everything has an abstraction layer to avoid spaghetti code. There are only like two or three instances where we need to pull back from the db using JavaScript, the rest is just the frontend pushing payloads from bot interactions.
+- Abstraction, Scalability, and Maintainability. Everything can be replaced and reimplemented using different methods; we really just used Python and MongoDB for this case. Why? Because it's easy to read, inherently making it easier to maintain. With how we designed the abstraction layers and decoupled logic, the code is easier to understand and scale. If you really want to port the backend to a different language, you just have to follow and translate the current architecture over to the language you want.
+
 <br>
 
 <h2 align="center">Tech Stack</h2>

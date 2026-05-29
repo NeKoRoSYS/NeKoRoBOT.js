@@ -16,7 +16,7 @@ from api.rest import router as rest_router
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from db.db_schemas import BasePayload
 from db.db_factory import db
-import logic.db_handler
+import logic.ws_handler
 
 class RateLimiter:
     def __init__(self, max_actions: int, timeframe: float = 1.0):
@@ -204,7 +204,7 @@ class WebSocketServer:
                 await websocket.close(code=1008, reason="Invalid Token")
                 return
             
-            success = await logic.db_handler.handle_handshake(websocket, payload, data.interaction_id)
+            success = await logic.ws_handler.handle_handshake(websocket, payload, data.interaction_id)
             if not success:
                 await websocket.close(code=1008, reason="Database Handshake Rejected")
                 return

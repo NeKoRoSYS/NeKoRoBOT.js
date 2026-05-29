@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 import uuid
@@ -16,7 +17,7 @@ from api.rest import router as rest_router
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from db.db_schemas import BasePayload
 from db.db_factory import db
-import logic.ws_handler
+import logic.db_handler
 
 class RateLimiter:
     def __init__(self, max_actions: int, timeframe: float = 1.0):
@@ -93,6 +94,7 @@ class WebSocketServer:
         self.vk = valkey.from_url(self.VALKEYURL, decode_responses=True)
         self.limiter = DistributedRateLimiter(self.vk, max_actions=25, timeframe=1.0)
         self.pubsub_task = asyncio.create_task(self._valkey_pubsub_listener())
+        self.dlq_cleanup_task = asyncio.create_task(self._dlq_archiver())
         yield
         if self.pubsub_task:
             self.pubsub_task.cancel()
@@ -101,6 +103,36 @@ class WebSocketServer:
             except asyncio.CancelledError:
                 pass
         await self.vk.close()
+        self.dlq_cleanup_task.cancel()
+    
+    async def _dlq_archiver(self):
+        """Periodically sweeps unresolved DLQs and archives them."""
+        await asyncio.sleep(10)
+        
+        while True:
+            try:
+                async for key in self.vk.scan_iter(match="dlq:*"):
+                    queue_len = await self.vk.llen(key)
+                    if queue_len > 0:
+                        messages = await self.vk.lrange(key, 0, -1)
+                        
+                        with open("dead_letters.log", "a") as log_file:
+                            for msg in messages:
+                                log_entry = {
+                                    "timestamp": datetime.utcnow().isoformat(),
+                                    "target_key": key,
+                                    "payload": orjson.loads(msg)
+                                }
+                                log_file.write(orjson.dumps(log_entry).decode() + "\n")
+                        
+                        await self.vk.delete(key)
+                        logging.warning(f"Archived {queue_len} dropped messages from {key}")
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logging.error(f"DLQ Archiver error: {e}")
+            await asyncio.sleep(300)
         
     async def _valkey_pubsub_listener(self):
         """Listens ONLY to this specific instance's channel for incoming remote messages."""
@@ -127,7 +159,6 @@ class WebSocketServer:
                         
                         async with self.vk.pipeline(transaction=True) as pipe:
                             pipe.rpush(dlq_key, orjson.dumps(payload_data))
-                            pipe.expire(dlq_key, 60)
                             await pipe.execute()
                             
                 except Exception as e:
@@ -204,7 +235,7 @@ class WebSocketServer:
                 await websocket.close(code=1008, reason="Invalid Token")
                 return
             
-            success = await logic.ws_handler.handle_handshake(websocket, payload, data.interaction_id)
+            success = await logic.db_handler.handle_handshake(websocket, payload, data.interaction_id)
             if not success:
                 await websocket.close(code=1008, reason="Database Handshake Rejected")
                 return

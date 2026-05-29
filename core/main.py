@@ -25,22 +25,15 @@ class DistributedRateLimiter:
         self.timeframe = timeframe
         
         self.lua_script = """
-        -- KEYS[1]: The specific rate limit key for this client
-        -- ARGV[1]: Current timestamp (used as both score and member)
-        -- ARGV[2]: The cutoff timestamp (now - timeframe)
-        -- ARGV[3]: Max allowed actions
+        -- KEYS[1]: the specific rate limit key for this client
+        -- ARGV[1]: current timestamp (used as both score and member)
+        -- ARGV[2]: the cutoff timestamp (now - timeframe)
+        -- ARGV[3]: max allowed actions
         -- ARGV[4]: TTL for the key in seconds
 
-        -- 1. Prune timestamps older than our timeframe window
         redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])
-        
-        -- 2. Get the current number of valid actions
         local current_count = redis.call('ZCARD', KEYS[1])
-        
-        -- 3. Always refresh the TTL so the key cleans up when the client disconnects
         redis.call('EXPIRE', KEYS[1], ARGV[4])
-        
-        -- 4. Check if we have room to add another action
         if tonumber(current_count) < tonumber(ARGV[3]) then
             redis.call('ZADD', KEYS[1], ARGV[1], ARGV[1])
             return 1 -- Allowed

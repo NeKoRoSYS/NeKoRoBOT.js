@@ -165,7 +165,6 @@ NeKoRoBOT.js is a stripped-down version of a proprietary Discord bot me and my f
 - The codebase is hardened and production-ready but it is not secure over the internet. To ensure security, add another layer of protection by setting up `nginx` (webserver) and `certbot` (SSL certificates) on your Linux VPS if you intend to deploy this bot on remote servers.
 - Make sure to sanitize the DB by using `motor` and passing structured dictionaries as data.
 - Use `asyncio` for the Python backend so that heavy-duty processing won't block bot function.
-- Replace the static handshake with JWT if you want to introduce another client connecting to the server.
 
 <br>
 

@@ -143,7 +143,7 @@ NeKoRoBOT.js is a stripped-down version of a proprietary Discord bot me and my f
 
 <h2 align="center">Features</h2>
 
-- **Separation of Concerns** - Node.js only handles Discord.js, your frontend; on the other hand, the project uses a separate backend using Python and FastAPI. The best part? The Python backend was built in such a way that it can be used for other purposes. This repo is secretly a secure backend solution comparable to the likes of Django!
+- **Separation of Concerns** - Node.js only handles Discord.js, your frontend; on the other hand, the project features a separate backend that uses Python and FastAPI. The best part? The backend was built in such a way that it can be used for other purposes. This repo is secretly a secure backend solution comparable to the likes of Django!
 - **Database-agnostic Backend** - Done via abstraction layer between the active DB implementation (currently MongoDB) and the data handlers. This makes it easier to swap from one database to another if necessary.
 - **Stateless and Scalable**
   - Uses `valkey`, an open-source version of Redis to manage concurrency.

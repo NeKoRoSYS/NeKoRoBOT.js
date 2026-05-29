@@ -23,21 +23,51 @@ class DistributedRateLimiter:
         self.vk = valkey_client
         self.max_actions = max_actions
         self.timeframe = timeframe
+        
+        self.lua_script = """
+        -- KEYS[1]: The specific rate limit key for this client
+        -- ARGV[1]: Current timestamp (used as both score and member)
+        -- ARGV[2]: The cutoff timestamp (now - timeframe)
+        -- ARGV[3]: Max allowed actions
+        -- ARGV[4]: TTL for the key in seconds
+
+        -- 1. Prune timestamps older than our timeframe window
+        redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])
+        
+        -- 2. Get the current number of valid actions
+        local current_count = redis.call('ZCARD', KEYS[1])
+        
+        -- 3. Always refresh the TTL so the key cleans up when the client disconnects
+        redis.call('EXPIRE', KEYS[1], ARGV[4])
+        
+        -- 4. Check if we have room to add another action
+        if tonumber(current_count) < tonumber(ARGV[3]) then
+            redis.call('ZADD', KEYS[1], ARGV[1], ARGV[1])
+            return 1 -- Allowed
+        else
+            return 0 -- Blocked
+        end
+        """
 
     async def is_allowed(self, client_id: str) -> bool:
         """Determines if a client is within their allowed action threshold."""
         key = f"rate_limit:{client_id}"
         now = time.time()
         clear_before = now - self.timeframe
+        ttl = int(self.timeframe) + 2
         
-        async with self.vk.pipeline(transaction=True) as pipe:
-            pipe.zremrangebyscore(key, 0, clear_before)
-            pipe.zcard(key)
-            pipe.zadd(key, {str(now): now})
-            pipe.expire(key, int(self.timeframe) + 2)
-            _, current_count, _, _ = await pipe.execute()
-            
-        return current_count < self.max_actions
+        # evaluate the script in valkey
+        result = await self.vk.eval(
+            self.lua_script, 
+            1,                # number of keys being passed
+            key,              # KEYS[1]
+            now,              # ARGV[1]
+            clear_before,     # ARGV[2]
+            self.max_actions, # ARGV[3]
+            ttl               # ARGV[4]
+        )
+        
+        return bool(result)
 
 class Server:
     "The brain. You don't have to touch this unless you now what you're doing. Implement custom logic at 'root/core/api'. :D"
@@ -139,6 +169,7 @@ class Server:
                         logging.warning(f"Client {target_id} offline. Pushing to DLQ.")
                         dlq_key = f"dlq:{target_id}"
                         await self.vk.rpush(dlq_key, orjson.dumps(payload_data))
+                        await self.vk.ltrim(dlq_key, -100, -1)
                         # async with self.vk.pipeline(transaction=True) as pipe:
                         #     pipe.rpush(dlq_key, orjson.dumps(payload_data))
                         #     await pipe.execute()

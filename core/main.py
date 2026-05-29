@@ -1,4 +1,3 @@
-import datetime
 import os
 import time
 import uuid
@@ -7,7 +6,6 @@ import orjson
 import asyncio
 import logging
 import secrets
-import collections
 from dotenv import load_dotenv
 from pydantic import ValidationError
 from contextlib import asynccontextmanager
@@ -18,24 +16,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from db.db_schemas import BasePayload
 from db.db_factory import db
 import logic.db_handler
-
-class RateLimiter:
-    def __init__(self, max_actions: int, timeframe: float = 1.0):
-        self.max_actions = max_actions
-        self.timeframe = timeframe
-        self.history = collections.deque()
-
-    def is_allowed(self) -> bool:
-        now = time.perf_counter()
-        
-        while self.history and (now - self.history[0] > self.timeframe):
-            self.history.popleft()
-            
-        if len(self.history) < self.max_actions:
-            self.history.append(now)
-            return True
-            
-        return False
 
 class DistributedRateLimiter:
     """Sliding-window rate limiter utilizing a distributed Valkey cluster."""
@@ -60,27 +40,24 @@ class DistributedRateLimiter:
         return current_count < self.max_actions
 
 class WebSocketServer:
+    "The brain. You don't have to touch this unless you now what you're doing. Implement custom logic at 'root/core/api'. :D"
     def __init__(self):
         load_dotenv()
         self.TOKEN = os.getenv('APITOKEN')
         self.HEADER = os.getenv('CLIENTHEADER')
         self.VALKEYURL = os.getenv('VALKEYURL')
         self.JWTSECRET = os.getenv('JWTSECRET')
-        
-        self.instance_id = str(uuid.uuid4())
-        self.CHANNELNAME = f"ws_instance:{self.instance_id}"
 
-        if not self.TOKEN:
-            raise ValueError("FATAL ERROR: The 'TOKEN' environment variable is not set or empty in .env file.")
+        if not self.TOKEN or not self.HEADER:
+            raise ValueError("FATAL ERROR: The 'TOKEN' or 'HEADER' environment variable is not set or empty in .env file.")
 
-        if not self.HEADER:
-            raise ValueError("FATAL ERROR: The 'HEADER' environment variable is not set or empty in .env file.")
-    
+        self.ROUTES = ROUTES
         self.app = FastAPI(lifespan=self.lifespan)
-        self.app.state.ws_server = self
         self.app.include_router(rest_router)
         self.app.add_api_websocket_route("/ws", self.websocket_endpoint)
-        self.ROUTES = ROUTES
+        self.app.state.ws_server = self
+        self.instance_id = str(uuid.uuid4())
+        self.CHANNELNAME = f"ws_instance:{self.instance_id}"
         self.local_connections = {}
         self.vk = None
         self.limiter = None
@@ -98,35 +75,40 @@ class WebSocketServer:
         yield
         if self.pubsub_task:
             self.pubsub_task.cancel()
-            try:
-                await self.pubsub_task
-            except asyncio.CancelledError:
-                pass
+        if self.dlq_cleanup_task:
+            self.dlq_cleanup_task.cancel()
+        await asyncio.gather(self.pubsub_task, self.dlq_cleanup_task, return_exceptions=True)
         await self.vk.close()
-        self.dlq_cleanup_task.cancel()
     
     async def _dlq_archiver(self):
-        """Periodically sweeps unresolved DLQs and archives them."""
+        """This is for messages that the server couldn't process while or after it dies. It periodically sweeps unresolved DLQs and archives them."""
         await asyncio.sleep(10)
         
         while True:
             try:
                 async for key in self.vk.scan_iter(match="dlq:*"):
-                    queue_len = await self.vk.llen(key)
-                    if queue_len > 0:
-                        messages = await self.vk.lrange(key, 0, -1)
-                        
-                        with open("dead_letters.log", "a") as log_file:
-                            for msg in messages:
-                                log_entry = {
-                                    "timestamp": datetime.utcnow().isoformat(),
-                                    "target_key": key,
-                                    "payload": orjson.loads(msg)
-                                }
-                                log_file.write(orjson.dumps(log_entry).decode() + "\n")
-                        
+                    messages = await self.vk.lrange(key, 0, -1)
+                    if messages:
+                        await asyncio.to_thread(self._write_dlq_logs, key, messages)
                         await self.vk.delete(key)
-                        logging.warning(f"Archived {queue_len} dropped messages from {key}")
+                        logging.warning(f"Archived {len(messages)} dropped messages from {key}")
+                        
+                # async for key in self.vk.scan_iter(match="dlq:*"):
+                #     queue_len = await self.vk.llen(key)
+                #     if queue_len > 0:
+                #         messages = await self.vk.lrange(key, 0, -1)
+                #         
+                #         with open("dead_letters.log", "a") as log_file:
+                #             for msg in messages:
+                #                 log_entry = {
+                #                     "timestamp": datetime.utcnow().isoformat(),
+                #                     "target_key": key,
+                #                     "payload": orjson.loads(msg)
+                #                 }
+                #                 log_file.write(orjson.dumps(log_entry).decode() + "\n")
+                #         
+                #         await self.vk.delete(key)
+                #         logging.warning(f"Archived {queue_len} dropped messages from {key}")
                 
             except asyncio.CancelledError:
                 break
@@ -135,7 +117,7 @@ class WebSocketServer:
             await asyncio.sleep(300)
         
     async def _valkey_pubsub_listener(self):
-        """Listens ONLY to this specific instance's channel for incoming remote messages."""
+        """Make multiple instances of the bot talk to each other. Listens ONLY to this specific instance's channel for incoming remote messages."""
         ps = self.vk.pubsub()
         await ps.subscribe(self.CHANNELNAME)
         logging.info(f"Instance {self.instance_id} subscribed to routing bus channel: {self.CHANNELNAME}")
@@ -156,10 +138,10 @@ class WebSocketServer:
                     else:
                         logging.warning(f"Client {target_id} offline. Pushing to DLQ.")
                         dlq_key = f"dlq:{target_id}"
-                        
-                        async with self.vk.pipeline(transaction=True) as pipe:
-                            pipe.rpush(dlq_key, orjson.dumps(payload_data))
-                            await pipe.execute()
+                        await self.vk.rpush(dlq_key, orjson.dumps(payload_data))
+                        # async with self.vk.pipeline(transaction=True) as pipe:
+                        #     pipe.rpush(dlq_key, orjson.dumps(payload_data))
+                        #     await pipe.execute()
                             
                 except Exception as e:
                     logging.error(f"Error distributing message payload over PubSub: {e}")
@@ -170,7 +152,7 @@ class WebSocketServer:
 
     async def route_message(self, target_client_id: str, payload_data: dict) -> bool:
         """
-        Intelligently routes a message to a client, whether they are connected 
+        Routes a message to a client, whether they are connected 
         to this specific server instance or another instance in the cluster.
         """
         if target_client_id in self.local_connections:
@@ -228,11 +210,8 @@ class WebSocketServer:
                 client_id = str(decoded.get("sub"))
                 if not client_id:
                     raise ValueError("JWT missing 'sub' claim")
-            except jwt.ExpiredSignatureError:
-                await websocket.close(code=1008, reason="Token Expired")
-                return
-            except jwt.InvalidTokenError:
-                await websocket.close(code=1008, reason="Invalid Token")
+            except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
+                await websocket.close(code=1008, reason=f"Invalid Token: {e}")
                 return
             
             success = await logic.db_handler.handle_handshake(websocket, payload, data.interaction_id)
@@ -245,12 +224,20 @@ class WebSocketServer:
             logging.info(f"Client {client_id} authenticated and routed to {self.instance_id}.")
 
             dlq_key = f"dlq:{client_id}"
-            while True:
-                queued_msg = await self.vk.lpop(dlq_key)
-                if not queued_msg:
-                    break
-                await websocket.send_bytes(queued_msg)
-                logging.info(f"Delivered queued DLQ message to {client_id}")
+            queued_msgs = await self.vk.lrange(dlq_key, 0, -1)
+            if queued_msgs:
+                for queued_msg in queued_msgs:
+                    await websocket.send_bytes(queued_msg)
+                await self.vk.delete(dlq_key)
+                logging.info(f"Delivered {len(queued_msgs)} DLQ messages to {client_id}")
+            
+            # dlq_key = f"dlq:{client_id}"
+            # while True:
+            #     queued_msg = await self.vk.lpop(dlq_key)
+            #     if not queued_msg:
+            #         break
+            #     await websocket.send_bytes(queued_msg)
+            #     logging.info(f"Delivered queued DLQ message to {client_id}")
             
         except (asyncio.TimeoutError, orjson.JSONDecodeError, ValidationError, Exception) as e:
             logging.error(f"Handshake failure: {e}")
@@ -285,9 +272,10 @@ class WebSocketServer:
                 action = data.action
                 interaction_id = data.interaction_id
 
-                if not await self.vk.exists(f"client_route:{client_id}"):
-                    await websocket.close(code=1008, reason="Session Invalidated")
-                    return
+                # we can trust the TCP connection enough to not rely on this block, it's just gonna add more load to valkey
+                # if not await self.vk.exists(f"client_route:{client_id}"):
+                #     await websocket.close(code=1008, reason="Session Invalidated")
+                #     return
                     
                 handler = self.ROUTES.get(action)
                 if handler:
@@ -307,12 +295,9 @@ class WebSocketServer:
             logging.exception("An unexpected WebSocket connection error occurred:")
         finally:
             self.local_connections.pop(client_id, None)
-            if client_id:
-                current_route = await self.vk.get(f"client_route:{client_id}")
-                if current_route == self.instance_id:
-                    await self.vk.delete(f"client_route:{client_id}")
-                
-                await self.vk.delete(f"rate_limit:{client_id}")
+            lua_script = "if valkey.call('get', KEYS[1]) == ARGV[1] then return valkey.call('del', KEYS[1]) else return 0 end"
+            await self.vk.eval(lua_script, 1, f"client_route:{client_id}", self.instance_id)
+            await self.vk.delete(f"rate_limit:{client_id}")
 
 server = WebSocketServer()
 app = server.app

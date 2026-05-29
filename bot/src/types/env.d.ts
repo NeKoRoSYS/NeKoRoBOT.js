@@ -7,6 +7,7 @@ declare global {
             DBURI: string;
             APIURL?: string;
             APITOKEN: string;
+            JWTSECRET: string;
         }
     }
 }

@@ -13,7 +13,6 @@ core/venv/
 bot/dist/
 node_modules/
 bot/node_modules/
-package-lock.json
 
 # --- App / Secrets ---
 .env

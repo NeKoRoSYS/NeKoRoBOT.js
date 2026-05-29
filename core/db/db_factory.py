@@ -5,11 +5,14 @@ from db.mongodb.user_repo import MongoUserRepository
 # Import future PostgreSQL/MySQL repos here
 
 load_dotenv()
-ENGNINE = os.getenv('DBENGINE')
+ENGINE = os.getenv('DBENGINE')
+
+if not ENGINE:
+    raise ValueError("FATAL ERROR: 'ENGINE' is missing in .env file.")
 
 class DatabaseFactory:
     def __init__(self):
-        self.db_engine = os.getenv(ENGNINE, "mongodb").lower()
+        self.db_engine = os.getenv(ENGINE, "mongodb").lower()
         
         if self.db_engine == "mongodb":
             self.user_repo = MongoUserRepository(user_collection)

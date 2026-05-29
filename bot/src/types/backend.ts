@@ -21,8 +21,7 @@ export interface BaseRequest {
 
 export interface HandshakeRequest extends BaseRequest {
     action: BackendAction.HANDSHAKE;
-    bot_id: string;    
-    auth_token: string;
+    token: string;
 }
 
 export interface CreateRequest extends BaseRequest {

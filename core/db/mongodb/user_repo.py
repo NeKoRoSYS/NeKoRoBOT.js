@@ -29,7 +29,7 @@ class MongoUserRepository:
         return await self.collection.find_one({"discord_id": discord_id}, {"_id": 0})
 
     # UPDATE
-    async def update_bio(self, discord_id: str, new_bio: str) -> bool:
+    async def update_user(self, discord_id: str, new_bio: str) -> bool:
         result = await self.collection.update_one(
             {"discord_id": discord_id}, 
             {"$set": {"bio": new_bio}}

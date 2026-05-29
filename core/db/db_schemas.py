@@ -6,8 +6,7 @@ class BasePayload(BaseModel):
     interaction_id: str
     
 class HandshakePayload(BasePayload):
-    bot_id: str
-    auth_token: str
+    token: str
     
 class DiscordUserPayload(BasePayload):
     discord_id: str

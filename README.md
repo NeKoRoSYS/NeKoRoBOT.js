@@ -102,6 +102,12 @@ This is a full-stack Discord.js Bot template that includes code for the frontend
 
 A lot of the Discord.js bot templates I've seen online are mainly designed for beginners. This project however, aims to accomodate intermediate to pro-level programmers who are more equipped to handle backend code. Compared to others, this project does not run by a monolithic architecture; it's built to be robust, modular, and scalable. I made it as generic as possible so that you can easily build on top of it with your own features in mind. NeKoRoBOT.js is built to be lean and unopinionated because every possible API interaction using the Discord bot counts and must be processed fast!
 
+<h3>Why choose Python?</h3>
+
+NeKoRoBOT.js is a stripped-down version of a proprietary Discord bot me and my friend made for a custom matchmaking platform for a shooter game. We chose the Python interpreting language as the bot's backend instead of putting everything on Node.js for the following reasons:
+- To have clean separation of concerns. We want the frontend to only handle Discord.js and not mix database/connection logic with it too much. Everything has an abstraction layer to avoid spaghetti code. There are only like two or three instances where we need to pull back from the db using JavaScript, the rest is just the frontend pushing payloads from bot interactions.
+- Abstraction, Scalability, and Maintainability. Everything can be replaced and reimplemented using different methods; we really just used Python and MongoDB for this case. Why? Because it's easy to read, inherently making it easier to maintain. With how we designed the abstraction layers and decoupled logic, the code is easier to understand and scale. If you really want to port the backend to a different language, you just have to follow and translate the current architecture over to the language you want.
+
 <br>
 
 <h2 align="center">Tech Stack</h2>
@@ -137,8 +143,9 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 
 <h2 align="center">Features</h2>
 
+- **Separation of Concerns** - Node.js only handles Discord.js, your frontend; on the other hand, the project uses a separate backend using Python and FastAPI.
 - **Database-agnostic Backend** - Done via abstraction layer between the active DB implementation (currently MongoDB) and the data handlers. This makes it easier to swap from one database to another if necessary.
-- **Scalable**
+- **Stateless and Scalable**
   - Uses `valkey`, an open-source version of Redis to manage concurrency.
   - Uses FastAPI to handle WebSocket and REST endpoints. This makes it easier to integrate a dashboard later on.
 - **Hardened Security**
@@ -158,15 +165,14 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 - The codebase is hardened and production-ready but it is not secure over the internet. To ensure security, add another layer of protection by setting up `nginx` (webserver) and `certbot` (SSL certificates) on your Linux VPS if you intend to deploy this bot on remote servers.
 - Make sure to sanitize the DB by using `motor` and passing structured dictionaries as data.
 - Use `asyncio` for the Python backend so that heavy-duty processing won't block bot function.
-- Replace the static handshake with JWT if you want to introduce another client connecting to the server.
 
 <br>
 
 <h2 align="center">Upcoming Features</h2>
 
+- Autogen database schemaas via OpenAPI for the frontend to use, to reduce occurences of bugs and malformed/mismatched payloads
+- GoLang reimplementation on another branch
 - Dashboard powered by React.js w/ Tailwind CSS
-  - Replace pure websockets with FastAPI websockets to easily communicate with REST endpoints
-  - JWT for handshake
 - The man, the myth, the legend—Documentation!
 
 <br>

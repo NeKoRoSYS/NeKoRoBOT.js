@@ -15,7 +15,7 @@ class IUserRepository(ABC):
         pass
         
     @abstractmethod
-    async def update_bio(self, discord_id: str, new_bio: str) -> bool:
+    async def update_user(self, discord_id: str, new_bio: str) -> bool:
         pass
         
     @abstractmethod

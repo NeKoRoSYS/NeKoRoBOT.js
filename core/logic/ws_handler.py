@@ -1,16 +1,14 @@
 import os
 from db.db_schemas import CreateUserPayload, DiscordUserPayload, HandshakePayload, UpdateUserPayload
+from db.db_controller import create_user, get_user, update_user, delete_user
 from pydantic import ValidationError
 from dotenv import load_dotenv
-from db.repo_factory import db
 from pymongo.errors import DuplicateKeyError
 
 # -- bot --
 
 load_dotenv()
 TOKEN = os.getenv('APITOKEN')
-
-in_flight_requests = set()
 
 if not TOKEN:
     raise ValueError("FATAL ERROR: 'TOKEN' is missing in .env file.")
@@ -24,20 +22,8 @@ async def handle_handshake(websocket, payload, interaction_id):
             "error": True, 
             "message": f"Invalid payload format: {e.errors()[0]['msg']}"
         })
-        return
-    
-    bot_id = data.bot_id
-    auth_token = data.auth_token
-    
-    if auth_token != TOKEN:
-        print(f"Blocked unauthorized handshake attempt from bot ID: {bot_id}")
-        await websocket.send_json({
-            "error": True, 
-            "message": "Unauthorized: Invalid API Token."
-        })
         return False
-
-    print(f"Handshake successful with bot: {bot_id}")
+    
     return True
 
 async def handle_create(websocket, payload, interaction_id):
@@ -53,20 +39,24 @@ async def handle_create(websocket, payload, interaction_id):
     discord_id = data.discord_id
     username = data.username
     
-    if discord_id in in_flight_requests:
+    vk = websocket.app.state.ws_server.vk
+    lock_key = f"link_lock:{discord_id}"
+    acquired_lock = await vk.set(lock_key, "locked", nx=True, ex=5)
+    
+    if not acquired_lock:
+        await websocket.send_json({"error": True, "interaction_id": interaction_id, "message": "A link request is already processing. Please wait."})
         return
-        
-    in_flight_requests.add(discord_id)
-    try: # You might have to remove in_flight_requests in the future if you want horizontal scaling
-        success = await db.user_repo.create_user(discord_id, username)
+    
+    try:
+        success = await create_user(discord_id, username)
         if success:
             await websocket.send_json({"event": "created", "interaction_id": interaction_id})
         else:
             await websocket.send_json({"error": True, "interaction_id": interaction_id, "message": "User already exists!"})
         pass
     finally:
-        in_flight_requests.remove(discord_id)
-
+        await vk.delete(lock_key)
+        
 async def handle_read(websocket, payload, interaction_id):
     try:
         data = DiscordUserPayload(**payload)
@@ -77,7 +67,7 @@ async def handle_read(websocket, payload, interaction_id):
             "message": f"Invalid payload format: {e.errors()[0]['msg']}"
         })
         return
-    user = await db.user_repo.get_user(data.discord_id)
+    user = await get_user(data.discord_id)
     if user:
         await websocket.send_json({"event": "read", "interaction_id": interaction_id, "data": user})
     else:
@@ -93,7 +83,7 @@ async def handle_update(websocket, payload, interaction_id):
             "message": f"Invalid payload format: {e.errors()[0]['msg']}"
         })
         return
-    success = await db.user_repo.update_bio(data.discord_id, data.bio)
+    success = await update_user(data.discord_id, data.bio)
     if success:
         await websocket.send_json({"event": "updated", "interaction_id": interaction_id})
     else:
@@ -109,7 +99,7 @@ async def handle_delete(websocket, payload, interaction_id):
             "message": f"Invalid payload format: {e.errors()[0]['msg']}"
         })
         return
-    success = await db.user_repo.delete_user(data.discord_id)
+    success = await delete_user(data.discord_id)
     if success:
         await websocket.send_json({"event": "deleted", "interaction_id": interaction_id})
     else:

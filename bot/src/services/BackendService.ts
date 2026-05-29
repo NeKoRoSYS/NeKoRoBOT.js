@@ -1,4 +1,5 @@
 import { WebSocket } from "ws";
+import jwt from "jsonwebtoken";
 import { BackendAction, BackendError, BackendEvent, BackendRequest, BackendResponse, BackendSuccessResponse } from "../types/backend";
 import { BotClient } from "../structures/BotClient";
 
@@ -22,14 +23,11 @@ export class BackendService {
         this.ws?.removeAllListeners();
 
         const apiToken = process.env.APITOKEN;
-        if (!apiToken) {
-            console.error('CRITICAL: APITOKEN is missing from environment variables.');
-            return;
-        }
-
         const clientHeader = process.env.CLIENTHEADER;
-        if (!clientHeader) {
-            console.error('CRITICAL: CLIENTHEADER is missing from environment variables.');
+        const jwtSecret = process.env.JWTSECRET;
+
+        if (!apiToken || !clientHeader || !jwtSecret) {
+            console.error('CRITICAL: APITOKEN, CLIENTHEADER, or JWTSECRET is missing from environment variables.');
             return;
         }
 
@@ -43,12 +41,18 @@ export class BackendService {
         this.ws.on('open', () => {
             console.log('Connected to Python Backend via WebSocket!');
             
+            const handshakeToken = jwt.sign(
+                { sub: botId, type: 'discord_bot' }, 
+                jwtSecret, 
+                { expiresIn: '1m' } 
+            );
+            
             this.ws?.send(JSON.stringify({ 
                 action: BackendAction.HANDSHAKE, 
                 interaction_id: "handshake_init",
-                bot_id: botId,
-                auth_token: apiToken
+                token: handshakeToken
             }));
+
             this.reconnectAttempts = 0;
         });
 
@@ -64,16 +68,23 @@ export class BackendService {
                         this.client.wsRequests.delete(payload.interaction_id);
                     }
                 }
-                
-                // if you ever want the Python backend to push events down to Discord 
-                // independently, you would catch those global events here using payload.event :D
 
+                if (payload.event === BackendEvent.ACCOUNT_LINKED && payload.discord_id) {
+                    try {
+                        const user = await this.client.users.fetch(payload.discord_id);
+                        if (user) {
+                            await user.send(`Your Standoff 2 ID (\`${payload.standoff2_id}\`) was successfully verified!`);
+                        }
+                    } catch (error) {
+                        console.warn(`Could not send DM to user ${payload.discord_id}`);
+                    }
+                }
             } catch (parseError) {
                 console.error('Failed to process WebSocket message:', parseError);
             }
         });
 
-        this.ws.on('close', () => {
+        this.ws.on('close', (code, reason) => {
             console.log('Lost connection to Backend. Reconnecting in 5 seconds...');
             
             for (const [_, { reject, timer }] of this.client.wsRequests.entries()) {

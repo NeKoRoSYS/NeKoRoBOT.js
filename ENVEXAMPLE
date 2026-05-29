@@ -10,6 +10,7 @@
 APIURL=http://localhost:8000/ws
 APITOKEN=your_secure_websocket_token_here
 CLIENTHEADER=TemplateBot/1.0
+JWTSECRET=random_64_char_string
 
 # Database Configuration (MongoDB)
 DBENGINE=mongodb

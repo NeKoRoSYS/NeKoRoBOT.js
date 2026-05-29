@@ -137,8 +137,9 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 
 <h2 align="center">Features</h2>
 
+- **Separation of Concerns** - Node.js only handles Discord.js, your frontend; on the other hand, the project uses a separate backend using Python and FastAPI.
 - **Database-agnostic Backend** - Done via abstraction layer between the active DB implementation (currently MongoDB) and the data handlers. This makes it easier to swap from one database to another if necessary.
-- **Scalable**
+- **Stateless and Scalable**
   - Uses `valkey`, an open-source version of Redis to manage concurrency.
   - Uses FastAPI to handle WebSocket and REST endpoints. This makes it easier to integrate a dashboard later on.
 - **Hardened Security**
@@ -165,8 +166,7 @@ A lot of the Discord.js bot templates I've seen online are mainly designed for b
 <h2 align="center">Upcoming Features</h2>
 
 - Dashboard powered by React.js w/ Tailwind CSS
-  - Replace pure websockets with FastAPI websockets to easily communicate with REST endpoints
-  - JWT for handshake
+  - implement JWT for handshake
 - The man, the myth, the legend—Documentation!
 
 <br>

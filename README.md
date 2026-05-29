@@ -170,6 +170,8 @@ NeKoRoBOT.js is a stripped-down version of a proprietary Discord bot me and my f
 
 <h2 align="center">Upcoming Features</h2>
 
+- Autogen database schemaas via OpenAPI for the frontend to use, to reduce occurences of bugs and malformed/mismatched payloads
+- GoLang reimplementation on another branch
 - Dashboard powered by React.js w/ Tailwind CSS
 - The man, the myth, the legend—Documentation!
 
